@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>舌戰</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#1d3b34; --tongue:#ff4f7b; --lily:#8fd3a8; }
+  * { box-sizing:border-box; margin:0; }
+  body { overflow:hidden; font-family:'Baloo 2','PingFang TC','Microsoft JhengHei',sans-serif; color:var(--ink); touch-action:none; user-select:none; -webkit-user-select:none; background:#bfe6ff; }
+  canvas { display:block; }
+  .panel { position:fixed; background:rgba(255,255,255,.88); border:2px solid var(--ink); border-radius:16px; padding:4px 14px; font-size:17px; font-weight:800; }
+  #stats { top:12px; left:12px; }
+  #demoEat { top:56px; right:12px; font:inherit; font-size:15px; font-weight:800; cursor:pointer; color:var(--ink); }
+  #mode { top:12px; right:12px; font:inherit; font-size:16px; font-weight:800; cursor:pointer; color:var(--ink); }
+  #cross { position:fixed; left:50%; top:50%; width:20px; height:20px; margin:-10px; border:3px solid #fff; border-radius:50%; box-shadow:0 0 0 2px var(--ink); pointer-events:none; transition:background .1s; }
+  #cross.on { background:var(--tongue); }
+  #hint { bottom:12px; left:50%; transform:translateX(-50%); font-size:14px; font-weight:600; white-space:nowrap; }
+  .btn { position:fixed; border-radius:50%; border:3px solid var(--ink); font:inherit; font-weight:800; color:#fff; }
+  #fire { right:24px; bottom:36px; width:92px; height:92px; background:var(--tongue); font-size:20px; }
+  #jump { right:130px; bottom:28px; width:64px; height:64px; background:#3ec1d3; font-size:17px; }
+  /* ===== 主畫面（手繪貼紙風）===== */
+  :root { --line:#161616; --frog:#7cbb3a; --paper:#fffdf5; }
+  .tc { font-family:'Noto Sans TC','Baloo 2','PingFang TC','Microsoft JhengHei',sans-serif; }
+  body.in-menu .hud { display:none !important; }
+  body:not(.touch) .touch-only, body.touch .desktop-only { display:none !important; }
+  #menu { position:fixed; inset:0; display:flex; align-items:center; padding:clamp(20px,5vw,72px);
+    background:linear-gradient(90deg, rgba(191,230,255,.92) 0%, rgba(191,230,255,.55) 38%, rgba(191,230,255,0) 60%); pointer-events:none; }
+  #menu > * { pointer-events:auto; }
+  .menu-col { display:flex; flex-direction:column; gap:22px; max-width:380px; width:100%; }
+  .logo { line-height:.9; }
+  .logo-main { display:block; font-size:clamp(84px,14vw,148px); font-weight:900; color:var(--tongue); letter-spacing:.02em;
+    -webkit-text-stroke:5px var(--line); paint-order:stroke fill; text-shadow:0 7px 0 var(--line); transform:rotate(-4deg); transform-origin:left bottom; }
+  .logo-sub { display:inline-block; margin-top:10px; font-family:'Baloo 2',sans-serif; font-size:20px; font-weight:800; letter-spacing:.32em;
+    background:var(--frog); color:var(--line); border:3px solid var(--line); border-radius:10px; padding:0 12px; transform:rotate(1.5deg); }
+  .menu-btns { display:flex; flex-direction:column; gap:12px; }
+  .mbtn { font:inherit; font-size:22px; font-weight:900; text-align:left; padding:10px 22px; color:var(--line); background:var(--paper);
+    border:3px solid var(--line); border-radius:16px; box-shadow:0 5px 0 var(--line); cursor:pointer; transition:transform .12s, box-shadow .12s; }
+  .menu-btns .mbtn:nth-child(odd) { transform:rotate(-1deg); } .menu-btns .mbtn:nth-child(even) { transform:rotate(.8deg); }
+  .mbtn:hover { transform:translateY(-2px) rotate(0) !important; box-shadow:0 7px 0 var(--line); }
+  .mbtn:active { transform:translateY(4px) !important; box-shadow:0 1px 0 var(--line); }
+  .mbtn.primary { background:var(--frog); font-size:26px; }
+  .mbtn .tag { float:right; font-size:14px; font-weight:800; background:var(--line); color:#fff; border-radius:999px; padding:2px 10px; margin-top:6px; }
+  .mbtn:focus-visible, .seg button:focus-visible, input:focus-visible { outline:3px solid #7a5cff; outline-offset:3px; }
+  .tip { font-size:15px; font-weight:700; opacity:.75; }
+  .sheet { position:fixed; inset:0; display:grid; place-items:center; padding:18px; background:rgba(22,22,22,.42); z-index:5; }
+  .card { background:var(--paper); border:3px solid var(--line); border-radius:22px; box-shadow:0 8px 0 var(--line);
+    padding:22px 24px; width:min(560px,100%); max-height:88vh; overflow:auto; display:flex; flex-direction:column; gap:14px; }
+  .card h2 { font-size:32px; font-weight:900; }
+  .card .sub { font-size:16px; font-weight:700; opacity:.7; margin-top:-8px; }
+  .modes { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px 10px; padding-top:6px; }
+  .mode { border:3px solid var(--line); border-radius:14px; padding:10px 12px; background:#fff; position:relative; }
+  .mode b { display:block; font-size:18px; font-weight:900; }
+  .mode span { font-size:14px; line-height:1.45; display:block; margin-top:2px; }
+  .mode i { position:absolute; top:-11px; right:10px; font-style:normal; font-size:12px; font-weight:800; background:var(--tongue); color:#fff;
+    border:2px solid var(--line); border-radius:999px; padding:0 8px; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:14px; font-size:18px; font-weight:800; }
+  .row input[type=range] { width:52%; accent-color:var(--tongue); }
+  .row input[type=checkbox] { width:24px; height:24px; accent-color:var(--tongue); }
+  .seg { display:flex; border:3px solid var(--line); border-radius:12px; overflow:hidden; }
+  .seg button { font:inherit; font-size:16px; font-weight:800; padding:6px 14px; border:0; background:#fff; color:var(--line); cursor:pointer; }
+  .seg button + button { border-left:3px solid var(--line); }
+  .seg button.on { background:var(--frog); }
+  .keys { display:grid; grid-template-columns:auto 1fr; gap:8px 14px; font-size:16px; align-items:center; }
+  .keys kbd { font-family:inherit; font-weight:800; font-size:15px; background:#fff; border:2px solid var(--line); border-bottom-width:4px;
+    border-radius:8px; padding:0 8px; white-space:nowrap; justify-self:start; }
+  .card h3 { font-size:19px; font-weight:900; margin-top:4px; }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .actions .mbtn, #pause .mbtn { text-align:center; flex:1; font-size:19px; }
+  #pauseBtn { top:12px; left:12px; width:44px; height:44px; padding:0; font-size:18px; cursor:pointer; color:var(--ink); }
+  body.touch #stats { left:66px; }
+  @media (max-aspect-ratio: 1/1) {
+    #menu { align-items:flex-end; justify-content:center; background:linear-gradient(0deg, rgba(191,230,255,.95) 0%, rgba(191,230,255,.6) 45%, rgba(191,230,255,0) 62%); }
+    .menu-col { gap:14px; }
+    .logo { text-align:center; } .logo-main { font-size:clamp(72px,24vw,120px); transform:rotate(-3deg); transform-origin:center; }
+    .mbtn { text-align:center; font-size:20px; padding:8px 18px; } .mbtn.primary { font-size:23px; }
+    .tip { text-align:center; }
+  }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<div id="stats" class="panel hud">果實 0　速度 0</div>
+<button id="pauseBtn" class="panel hud touch-only" aria-label="暫停">❚❚</button>
+<button id="mode" class="panel hud">模式：盪鞦韆</button>
+<button id="demoEat" class="panel hud">示範吞人 (G)</button>
+<div id="cross" class="hud"></div>
+<div id="hint" class="panel hud desktop-only">按住左鍵吐舌勾住．WASD 移動．空白鍵跳．Esc 暫停</div>
+<button id="jump" class="btn hud touch-only">跳</button>
+<button id="fire" class="btn hud touch-only">吐舌</button>
+
+<!-- 主畫面 -->
+<div id="menu" class="tc">
+  <div class="menu-col">
+    <div class="logo"><span class="logo-main">舌戰</span><span class="logo-sub">TONGUE WAR</span></div>
+    <nav class="menu-btns">
+      <button class="mbtn primary" id="go">開始練習</button>
+      <button class="mbtn" data-open="modesPanel">多人對戰<span class="tag">製作中</span></button>
+      <button class="mbtn" data-open="settingsPanel">設定</button>
+      <button class="mbtn" data-open="helpPanel">操作說明</button>
+    </nav>
+    <p class="tip">點點看旁邊的青蛙</p>
+  </div>
+</div>
+
+<!-- 多人對戰 -->
+<div id="modesPanel" class="sheet tc" hidden>
+  <div class="card">
+    <h2>多人對戰</h2>
+    <p class="sub">這些模式正在製作中，做好一個就開放一個</p>
+    <div class="modes">
+      <div class="mode"><i>製作中</i><b>團隊吞噬戰</b><span>限時內吃最多人的隊伍獲勝</span></div>
+      <div class="mode"><i>製作中</i><b>全滅戰</b><span>被吃就不能重生，全隊被吞就輸</span></div>
+      <div class="mode"><i>製作中</i><b>搶蛋模式</b><span>把中間的蛋運回自己的基地</span></div>
+      <div class="mode"><i>製作中</i><b>獵人與獵物</b><span>少數獵人追捕一群會勾爪的獵物</span></div>
+      <div class="mode"><i>製作中</i><b>競速模式</b><span>勾爪飛越賽道，比誰先到終點</span></div>
+      <div class="mode"><i>製作中</i><b>王者之山</b><span>佔領發光區域，累積分數</span></div>
+      <div class="mode"><i>製作中</i><b>大胃王</b><span>個人大亂鬥，吃掉第一名搶走他的增益</span></div>
+    </div>
+    <div class="actions"><button class="mbtn" data-close>返回</button></div>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div id="settingsPanel" class="sheet tc" hidden>
+  <div class="card">
+    <h2>設定</h2>
+    <label class="row">視角靈敏度 <input id="sens" type="range" min="0.3" max="2.5" step="0.1" value="1"></label>
+    <label class="row">上下視角反轉 <input id="invertY" type="checkbox"></label>
+    <div class="row">舌頭模式
+      <div class="seg" id="tongueSeg"><button data-swing="1" class="on">盪鞦韆</button><button data-swing="0">直拉</button></div>
+    </div>
+    <div class="actions"><button class="mbtn" data-close>完成</button></div>
+  </div>
+</div>
+
+<!-- 操作說明 -->
+<div id="helpPanel" class="sheet tc" hidden>
+  <div class="card">
+    <h2>操作說明</h2>
+    <h3 class="desktop-only">電腦</h3>
+    <div class="keys desktop-only">
+      <kbd>滑鼠移動</kbd><span>轉視角（開始後滑鼠會鎖定在畫面中心）</span>
+      <kbd>按住左鍵</kbd><span>吐舌頭，勾到樹幹或浮石就會黏住，放開飛出去</span>
+      <kbd>W A S D</kbd><span>移動；盪在空中時也能稍微控制方向</span>
+      <kbd>空白鍵</kbd><span>跳</span>
+      <kbd>Esc</kbd><span>暫停</span>
+    </div>
+    <h3>手機</h3>
+    <div class="keys">
+      <kbd>左半邊拖曳</kbd><span>移動</span>
+      <kbd>右半邊拖曳</kbd><span>轉視角</span>
+      <kbd>吐舌</kbd><span>按住勾住，放開飛出去</span>
+      <kbd>跳</kbd><span>跳</span>
+    </div>
+    <h3>小技巧</h3>
+    <p style="font-size:16px;line-height:1.6">準星變成粉紅色就代表勾得到。盪到最低點附近放開，可以甩得最遠。</p>
+    <div class="actions"><button class="mbtn" data-close>知道了</button></div>
+  </div>
+</div>
+
+<!-- 暫停 -->
+<div id="pause" class="sheet tc" hidden>
+  <div class="card" style="width:min(380px,100%)">
+    <h2>暫停</h2>
+    <p class="sub" id="pauseText" hidden></p>
+    <button class="mbtn primary" id="resume">繼續</button>
+    <button class="mbtn" data-open="settingsPanel">設定</button>
+    <button class="mbtn" id="toMenu">回到主畫面</button>
+  </div>
+</div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const isTouch = 'ontouchstart' in window;
+
+// ===== 手感參數（可以自己調調看）=====
+const GRAVITY = 30, MOVE_SPEED = 12, AIR_CONTROL = 14;
+const RANGE = 50;            // 舌頭射程
+const TONGUE_SPEED = 170;    // 舌頭飛行速度
+const PULL_FORCE = 95;       // 直拉模式的拉力
+const REEL_SPEED = 5;        // 盪鞦韆模式自動收舌的速度
+const JUMP = 13;
+
+// ===== 場景 =====
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.prepend(renderer.domElement);
+const canvas = renderer.domElement;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#bfe6ff');
+scene.fog = new THREE.Fog('#bfe6ff', 60, 200);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 600);
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+scene.add(new THREE.HemisphereLight(0xffffff, 0x4f8f68, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 0.7); sun.position.set(40, 80, 30); scene.add(sun);
+
+const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
+const water = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), lam('#5fb8c9'));
+water.rotation.x = -Math.PI / 2; water.position.y = -0.6; scene.add(water);
+const ground = new THREE.Mesh(new THREE.BoxGeometry(180, 1, 180), lam('#6dba87'));
+ground.position.y = -0.5; scene.add(ground);
+const grid = new THREE.GridHelper(180, 30, 0x72bd8b, 0x72bd8b); grid.position.y = 0.01; scene.add(grid);
+
+// 固定亂數，讓地圖每次都一樣
+let seed = 11;
+const R = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+const hookables = [];          // 可以被舌頭勾住的物體
+const trunks = [], rocks = [];
+// 裝飾用的另一組亂數，不會影響地圖配置
+let seed2 = 97;
+const D = () => (seed2 = (seed2 * 16807) % 2147483647) / 2147483647;
+// 依照座標產生固定雜訊，讓接縫處的頂點變形一致
+const hash = (x, y, z) => { const v = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return v - Math.floor(v); };
+const vlam = (opts = {}) => new THREE.MeshLambertMaterial({ vertexColors: true, ...opts });
+
+// 有樹皮紋路的樹幹
+function barkGeometry(r, h) {
+  const g = new THREE.CylinderGeometry(r, r * 1.15, h, 22, Math.ceil(h / 2));
+  const p = g.attributes.position, col = [], c = new THREE.Color();
+  const dark = new THREE.Color('#2c5e45'), light = new THREE.Color('#4a8a68');
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const ridge = Math.sin(Math.atan2(z, x) * 9 + y * 0.18) * 0.5 + 0.5;
+    const n = hash(Math.round(x * 10), Math.round(y * 10), Math.round(z * 10));
+    const k = 1 + (ridge - 0.5) * 0.09 + (n - 0.5) * 0.05;
+    p.setX(i, x * k); p.setZ(i, z * k);
+    c.copy(dark).lerp(light, ridge * 0.75 + n * 0.25); col.push(c.r, c.g, c.b);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
+}
+// 凹凸不平、頂部長青苔的浮石
+function rockGeometry(r) {
+  const g = new THREE.IcosahedronGeometry(r, 2);
+  const p = g.attributes.position, col = [], c = new THREE.Color(), v = new THREE.Vector3();
+  const stone = new THREE.Color('#b9a877'), stoneDark = new THREE.Color('#8f8158'), moss = new THREE.Color('#5fa873');
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    const n = hash(Math.round(v.x * 4), Math.round(v.y * 4), Math.round(v.z * 4));
+    v.multiplyScalar(0.88 + n * 0.22);
+    p.setXYZ(i, v.x, v.y, v.z);
+    const up = v.y / r;
+    if (up > 0.35 + n * 0.2) c.copy(moss).offsetHSL(0, 0, (n - 0.5) * 0.1);
+    else c.copy(stoneDark).lerp(stone, n);
+    col.push(c.r, c.g, c.b);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+const leafMats = ['#5fb07c', '#6fbf8f', '#4f9e6c', '#7fcf96'].map((c) => new THREE.MeshPhongMaterial({ color: c, flatShading: true, shininess: 0 }));
+const vineMat = lam('#2f6b4c'), rootMat = lam('#3a6e52');
+const barkMat = vlam();
+for (let i = 0; i < 26; i++) {
+  const x = (R() - 0.5) * 150, z = (R() - 0.5) * 150;
+  if (Math.hypot(x, z) < 12) continue;
+  const r = 1.8 + R() * 2, h = 14 + R() * 30;
+  const t = new THREE.Mesh(barkGeometry(r, h), barkMat);
+  t.position.set(x, h / 2, z); scene.add(t);
+  // 樹頂平台
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.7, r * 1.45, 0.7, 28), lam('#6fbf8f'));
+  cap.position.set(x, h, z); scene.add(cap);
+  // 平台邊緣的葉子
+  const leaves = 7 + Math.floor(D() * 4);
+  for (let k = 0; k < leaves; k++) {
+    const a = (k / leaves) * Math.PI * 2 + D() * 0.4;
+    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r * (0.45 + D() * 0.25), 0), leafMats[Math.floor(D() * 4)]);
+    leaf.scale.y = 0.55;
+    leaf.position.set(x + Math.cos(a) * r * 1.65, h - 0.15, z + Math.sin(a) * r * 1.65);
+    leaf.rotation.set(D(), D() * 3, D());
+    scene.add(leaf);
+  }
+  // 垂下來的藤蔓
+  for (let k = 0; k < 3; k++) {
+    const a = D() * Math.PI * 2, L = 3 + D() * 6;
+    const vine = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, L, 5), vineMat);
+    vine.position.set(x + Math.cos(a) * r * 1.5, h - L / 2, z + Math.sin(a) * r * 1.5);
+    scene.add(vine);
+    const tip = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), leafMats[k % 4]);
+    tip.position.set(vine.position.x, h - L, vine.position.z); scene.add(tip);
+  }
+  // 樹根
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * Math.PI * 2 + D();
+    const root = new THREE.Mesh(new THREE.SphereGeometry(r * 0.38, 10, 8), rootMat);
+    root.scale.set(2.2, 0.8, 1);
+    root.position.set(x + Math.cos(a) * r * 1.05, 0.05, z + Math.sin(a) * r * 1.05);
+    root.rotation.y = -a;
+    scene.add(root);
+  }
+  hookables.push(t, cap); trunks.push([x, z, r, h]);
+}
+const rockMat = new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 0 });
+for (let i = 0; i < 12; i++) {
+  const x = (R() - 0.5) * 150, z = (R() - 0.5) * 150, y = 26 + R() * 22, r = 2.5 + R() * 2.5;
+  const m = new THREE.Mesh(rockGeometry(r), rockMat);
+  m.position.set(x, y, z); m.rotation.y = D() * 6; scene.add(m);
+  // 底下的石鐘乳
+  for (let k = 0; k < 3; k++) {
+    const drip = new THREE.Mesh(new THREE.ConeGeometry(r * 0.22, r * (0.5 + D() * 0.6), 5), lam('#8f8158'));
+    drip.rotation.x = Math.PI;
+    drip.position.set(x + (D() - 0.5) * r, y - r * 0.85, z + (D() - 0.5) * r);
+    scene.add(drip);
+  }
+  hookables.push(m); rocks.push([x, y, z, r]);
+}
+
+// 岸邊、草、花、荷葉
+const shore = new THREE.Mesh(new THREE.BoxGeometry(188, 1, 188), lam('#e8d9a8'));
+shore.position.y = -1.05; scene.add(shore);
+const dummy = new THREE.Object3D(), tint = new THREE.Color();
+const GRASS = 4500;
+const grass = new THREE.InstancedMesh(new THREE.ConeGeometry(0.05, 0.45, 3), lam('#ffffff'), GRASS);
+let gx = 0, gz = 0;
+for (let i = 0; i < GRASS; i++) {
+  if (i % 5 === 0) { gx = (D() - 0.5) * 176; gz = (D() - 0.5) * 176; }   // 每 5 根一叢
+  dummy.position.set(gx + (D() - 0.5) * 0.5, 0.2, gz + (D() - 0.5) * 0.5);
+  dummy.rotation.set((D() - 0.5) * 0.6, D() * 3, (D() - 0.5) * 0.6);
+  dummy.scale.setScalar(0.7 + D() * 0.7); dummy.updateMatrix();
+  grass.setMatrixAt(i, dummy.matrix);
+  grass.setColorAt(i, tint.set('#4f9e6c').offsetHSL((D() - 0.5) * 0.04, 0, (D() - 0.5) * 0.12));
+}
+scene.add(grass);
+const flowers = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.18, 0), lam('#ffffff'), 160);
+const petal = ['#ffffff', '#ffd23f', '#ff8fb1', '#c9a7ff'];
+for (let i = 0; i < 160; i++) {
+  dummy.position.set((D() - 0.5) * 176, 0.25, (D() - 0.5) * 176);
+  dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(1); dummy.updateMatrix();
+  flowers.setMatrixAt(i, dummy.matrix); flowers.setColorAt(i, tint.set(petal[i % 4]));
+}
+scene.add(flowers);
+const pads = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.6, 1.6, 0.12, 18, 1, false, 0.3, Math.PI * 2 - 0.3), lam('#4f9e6c'), 90);
+for (let i = 0; i < 90; i++) {
+  const a = D() * Math.PI * 2, d = 98 + D() * 60;
+  dummy.position.set(Math.cos(a) * d, -0.55, Math.sin(a) * d);
+  dummy.rotation.set(0, D() * 6, 0); dummy.scale.setScalar(0.6 + D() * 0.9); dummy.updateMatrix();
+  pads.setMatrixAt(i, dummy.matrix);
+}
+scene.add(pads);
+// 雲
+const cloudMat = new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.35 });
+for (let i = 0; i < 9; i++) {
+  const cloud = new THREE.Group(), a = D() * Math.PI * 2, d = 150 + D() * 80;
+  for (let k = 0; k < 5; k++) {
+    const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(6 + D() * 6, 1), cloudMat);
+    puff.position.set((k - 2) * 8 + D() * 4, D() * 4, D() * 6); puff.scale.y = 0.6; cloud.add(puff);
+  }
+  cloud.position.set(Math.cos(a) * d, 70 + D() * 30, Math.sin(a) * d);
+  cloud.lookAt(0, cloud.position.y, 0);
+  scene.add(cloud);
+}
+
+// 果實：本體、梗、葉子和光暈
+const fruitMat = new THREE.MeshLambertMaterial({ color: '#ffd23f', emissive: '#ffb000', emissiveIntensity: 0.5 });
+const glowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,220,90,.75)'); gr.addColorStop(1, 'rgba(255,220,90,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+const fruits = [];
+function placeFruit(f) { f.position.set((R() - 0.5) * 150, 8 + R() * 38, (R() - 0.5) * 150); }
+for (let i = 0; i < 12; i++) {
+  const f = new THREE.Group(), inner = new THREE.Group();
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.9, 20, 14), fruitMat); ball.scale.y = 0.92; inner.add(ball);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.5, 5), lam('#7a5530')); stem.position.y = 0.95; inner.add(stem);
+  const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), leafMats[0]);
+  leaf.scale.set(1, 0.25, 0.55); leaf.position.set(0.3, 1.05, 0); leaf.rotation.z = -0.5; inner.add(leaf);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, depthWrite: false, transparent: true }));
+  glow.scale.setScalar(4.5); inner.add(glow);
+  f.add(inner); f.userData.inner = inner;
+  placeFruit(f); scene.add(f); fruits.push(f);
+}
+
+// 玩家：手繪貼紙風的呆臉青蛙（平塗顏色 + 粗黑外框）
+// 亮暗兩階很接近，看起來像平塗，只留一點點立體感
+const toonRamp = new THREE.DataTexture(new Uint8Array([205, 238]), 2, 1, THREE.LuminanceFormat);
+toonRamp.minFilter = toonRamp.magFilter = THREE.NearestFilter; toonRamp.generateMipmaps = false; toonRamp.needsUpdate = true;
+// 外框只畫「外輪廓」：青蛙本體先在模板緩衝區做記號，黑色外殼只畫在沒有記號的地方，
+// 所以部位和部位之間的接縫不會出現黑線
+const markStencil = { stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp };
+const frogMat = new THREE.MeshToonMaterial({ color: '#5f9a2a', gradientMap: toonRamp, ...markStencil });
+const inkFront = new THREE.MeshBasicMaterial({ color: '#161616', ...markStencil });
+const lineMat = new THREE.MeshBasicMaterial({
+  color: '#161616', side: THREE.BackSide,
+  stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc,
+  stencilFail: THREE.KeepStencilOp, stencilZFail: THREE.KeepStencilOp, stencilZPass: THREE.KeepStencilOp,
+});
+function fill(geo) { const m = new THREE.Mesh(geo, frogMat); m.renderOrder = 1; return m; }
+function outlined(geo, thick = 0.1) {
+  const g = new THREE.Group();
+  g.add(fill(geo));
+  geo.computeBoundingSphere();
+  const hull = new THREE.Mesh(geo, lineMat);
+  hull.scale.setScalar(1 + thick / geo.boundingSphere.radius);
+  hull.renderOrder = 2;          // 本體畫完才畫外框
+  g.add(hull);
+  return g;
+}
+const player = new THREE.Group();
+const bodyRig = new THREE.Group(); player.add(bodyRig);
+// 身體：頭和身體連成一塊的方圓形，稍微矮一點，讓短腿露出來
+const profile = [[0, -0.92], [0.5, -0.92], [0.7, -0.84], [0.78, -0.6], [0.8, -0.2], [0.84, 0.2], [0.8, 0.5], [0.66, 0.74], [0.4, 0.86], [0, 0.9]]
+  .map(([x, y]) => new THREE.Vector2(x, y));
+const torso = outlined(new THREE.LatheGeometry(profile, 48), 0.12);
+torso.scale.set(1.12, 0.85, 0.9); torso.position.y = 0.12; bodyRig.add(torso);
+// 頭頂（眼睛凸起 + 中間補色）放在同一組，張嘴時整組往上抬，像下巴打開
+const EYE_Y = 0.82;
+const headTop = new THREE.Group(); bodyRig.add(headTop);
+const eyes = [];
+for (const sx of [-0.34, 0.34]) {
+  const bump = outlined(new THREE.SphereGeometry(0.34, 24, 16), 0.1);
+  bump.position.set(sx * 1.08, EYE_Y, -0.08); headTop.add(bump);
+  const eye = new THREE.Group(); eye.position.set(sx * 1.08, EYE_Y + 0.02, -0.44); headTop.add(eye);
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 10), inkFront);
+  dot.scale.z = 0.5; dot.renderOrder = 1; eye.add(dot);
+  eyes.push(eye);
+}
+const bridge = fill(new THREE.CylinderGeometry(0.27, 0.27, 0.74, 20));
+bridge.rotation.z = Math.PI / 2; bridge.position.set(0, EYE_Y - 0.06, -0.08); headTop.add(bridge);
+
+// 嘴巴：黑色嘴唇外框 + 深紅色口腔 + 粉紅舌根，三層都貼著臉的弧度
+const MOUTH_Y = 0.44, MOUTH_W = 0.3, MOUTH_SEGS = 40;
+// 身體表面在 (x, y) 的位置：依照身體的旋轉輪廓算，嘴巴每一點都貼著臉
+function faceZ(x, y) {
+  const yt = (y - torso.position.y) / torso.scale.y;
+  let r = profile[profile.length - 1].x;
+  for (let i = 1; i < profile.length; i++) {
+    const p0 = profile[i - 1], p1 = profile[i];
+    if (yt <= p1.y) { r = p0.x + (p1.x - p0.x) * ((yt - p0.y) / (p1.y - p0.y)); break; }
+  }
+  const xr = r * torso.scale.x, zr = r * torso.scale.z;
+  return -zr * Math.sqrt(Math.max(0, 1 - (x / xr) ** 2));
+}
+// 嘴巴用一條條細長的直條拼成（不用扇形），每個頂點都貼在曲面上，才不會被身體穿過去
+const MCOLS = 24;
+function mouthLayer(color, out) {
+  const g = new THREE.BufferGeometry(), idx = [], v = (i, j) => i * 3 + j;
+  g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array((MCOLS + 1) * 3 * 3), 3));
+  for (let i = 0; i < MCOLS; i++) for (let j = 0; j < 2; j++)
+    idx.push(v(i, j), v(i + 1, j + 1), v(i + 1, j), v(i, j), v(i, j + 1), v(i + 1, j + 1));
+  g.setIndex(idx);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color, ...markStencil }));
+  m.renderOrder = 1; m.frustumCulled = false; m.userData.out = out;
+  return m;
+}
+// 每幀重新排嘴巴形狀：中心在 (0, cy)，半寬 hw、半高 hh 的橢圓
+function shapeMouth(m, cy, hw, hh) {
+  const p = m.geometry.attributes.position, out = m.userData.out;
+  for (let i = 0; i <= MCOLS; i++) {
+    const x = -hw + (2 * hw * i) / MCOLS, k = Math.sqrt(Math.max(0, 1 - (x / hw) ** 2));
+    for (let j = 0; j < 3; j++) {
+      const y = cy + (j - 1) * hh * k;
+      p.setXYZ(i * 3 + j, x, y, faceZ(x, y) - out);
+    }
+  }
+  p.needsUpdate = true; m.visible = hh > 0.005;
+}
+const lip = mouthLayer('#161616', 0.006);
+const cavity = mouthLayer('#4a0f1a', 0.012);
+const tongueRoot = mouthLayer('#ff6f8f', 0.018);
+bodyRig.add(lip, cavity, tongueRoot);
+let mouthOpen = 0, mouthCY = MOUTH_Y;
+
+// 鼓起來的臉頰和撐大的肚子（平常縮到看不見）
+const cheeks = [];
+for (const sx of [-1, 1]) {
+  const c = outlined(new THREE.SphereGeometry(0.32, 20, 14), 0.1);
+  c.position.set(sx * 0.7, 0.38, -0.3); c.visible = false; bodyRig.add(c); cheeks.push(c);
+}
+// 吃東西的狀態：鼓著嘴嚼一段時間，嚼完臉頰慢慢消下去
+let eatState = null;
+function startEat(kind) {
+  const big = kind === 'person';
+  eatState = { big, t: 0, chew: big ? 4 : 0.9 };
+}
+// 短短的手，從身體側面伸出來
+for (const sx of [-1, 1]) {
+  const arm = outlined(new THREE.CylinderGeometry(0.14, 0.17, 0.55, 14), 0.09);
+  arm.position.set(sx * 0.92, -0.1, -0.05); arm.rotation.z = sx * 0.95; bodyRig.add(arm);
+  const hand = outlined(new THREE.SphereGeometry(0.16, 14, 10), 0.09);
+  hand.position.set(sx * 1.13, -0.26, -0.05); bodyRig.add(hand);
+}
+// 兩隻短腿
+const feet = [];
+for (const sx of [-0.32, 0.32]) {
+  const foot = outlined(new THREE.SphereGeometry(0.22, 16, 12), 0.09);
+  foot.scale.set(1, 1.2, 1.05); foot.position.set(sx, -0.62, -0.05); player.add(foot); feet.push(foot);
+}
+scene.add(player);
+// 腳下的影子：幫助判斷自己離地面多高
+const shadow = new THREE.Mesh(new THREE.CircleGeometry(1.1, 24), new THREE.MeshBasicMaterial({ color: '#1d3b34', transparent: true, opacity: 0.28, depthWrite: false }));
+shadow.rotation.x = -Math.PI / 2; scene.add(shadow);
+const shadowRay = new THREE.Raycaster(), DOWN = new THREE.Vector3(0, -1, 0), shadowTargets = [...hookables, ground];
+const pos = new THREE.Vector3(0, 1, 0), vel = new THREE.Vector3();
+let yaw = 0, pitch = 0.15, grounded = false, score = 0;
+
+// 舌頭
+const tongueMat = lam('#ff4f7b');
+const tongueBody = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1, 10), tongueMat);
+const tongueTip = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), tongueMat);
+const tongueBase = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1, 10), tongueMat);   // 嘴裡伸出來的那一段
+const tongueJoint = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), tongueMat);         // 轉彎處
+scene.add(tongueBody, tongueTip, tongueBase, tongueJoint);
+function placeSegment(mesh, a, b, w) {
+  const dir = b.clone().sub(a), len = Math.max(dir.length(), 0.001);
+  mesh.position.copy(a).addScaledVector(dir, 0.5);
+  mesh.quaternion.setFromUnitVectors(UP, dir.divideScalar(len));
+  mesh.scale.set(w, len, w);
+}
+let tongue = null;       // { phase: 'out' | 'stuck' | 'back', tip, target, hit, L }
+let holding = false, swingMode = true;
+const raycaster = new THREE.Raycaster();
+const UP = new THREE.Vector3(0, 1, 0);
+
+function aimDir() {
+  return new THREE.Vector3(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+}
+// 舌頭從嘴巴的位置吐出來（只影響畫面，勾點和物理都不變）
+// out > 0：在臉前方多少；out < 0：在嘴巴裡面多深
+function mouthPoint(out) {
+  player.updateMatrixWorld(true);
+  return bodyRig.localToWorld(new THREE.Vector3(0, mouthCY, faceZ(0, mouthCY) - out));
+}
+// 舌頭先筆直伸出嘴巴一小段，再轉向目標，所以往上或往旁邊瞄也不會穿過自己的頭和臉頰
+const TONGUE_EXIT = 0.4;
+function mouth() { return mouthPoint(TONGUE_EXIT); }
+// 從相機中心射線找勾點，只算玩家射程內的
+function findHook() {
+  raycaster.set(camera.position, aimDir());
+  for (const h of raycaster.intersectObjects(hookables)) {
+    if (h.point.distanceTo(pos) <= RANGE) return h.point.clone();
+  }
+  return null;
+}
+function fireDown() {
+  holding = true;
+  if (tongue) return;
+  const hit = findHook();
+  tongue = { phase: 'out', tip: mouth(), target: hit || pos.clone().addScaledVector(aimDir(), RANGE), hit: !!hit };
+}
+function fireUp() { holding = false; if (tongue && tongue.phase !== 'back') tongue.phase = 'back'; }
+function jump() { if (grounded) { vel.y = JUMP; grounded = false; } }
+
+// ===== 操作 =====
+const keys = {};
+let joy = null, look = null, joyF = 0, joyS = 0, started = false;
+let SENS = 1, INVERT_Y = false;
+document.body.classList.add('in-menu');
+if (isTouch) document.body.classList.add('touch');
+addEventListener('keydown', (e) => {
+  if (!started) return;
+  keys[e.code] = true;
+  if (e.code === 'KeyG') startEat('person');
+  if (e.code === 'Space') { e.preventDefault(); jump(); }
+});
+addEventListener('keyup', (e) => (keys[e.code] = false));
+// 滑鼠鎖定：游標隱藏並固定在中心，移動滑鼠只會轉視角
+const locked = () => document.pointerLockElement === canvas;
+function lockMouse() { if (!isTouch) try { canvas.requestPointerLock(); } catch (e) {} }
+const pauseEl = document.getElementById('pause'), pauseText = document.getElementById('pauseText');
+document.addEventListener('pointerlockerror', () => {
+  if (!started) return;
+  pauseEl.hidden = false; pauseText.hidden = false;
+  pauseText.innerHTML = '滑鼠沒有鎖定成功，請再按一次「繼續」。<br>如果一直不行，請下載這個檔案，用 Chrome 或 Edge 直接打開。';
+});
+document.addEventListener('pointerlockchange', () => {
+  if (locked()) { pauseEl.hidden = true; pauseText.hidden = true; closeSheets(); return; }
+  if (!started || isTouch) return;
+  fireUp(); pauseEl.hidden = false;
+});
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('mousedown', (e) => {
+  if (!started || isTouch) return;
+  if (locked()) { if (e.button === 0) fireDown(); }
+  else lockMouse();
+});
+addEventListener('mouseup', (e) => { if (e.button === 0) fireUp(); });
+addEventListener('mousemove', (e) => {
+  if (locked()) {
+    yaw -= e.movementX * 0.0025 * SENS;
+    pitch = Math.max(-1.5, Math.min(1.5, pitch - e.movementY * 0.0022 * SENS * (INVERT_Y ? -1 : 1)));
+  }
+});
+
+// 手機：左半邊移動搖桿，右半邊拖曳轉視角
+const cl = (v) => Math.max(-1, Math.min(1, v));
+canvas.addEventListener('touchstart', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.clientX < innerWidth / 2 && !joy) joy = { id: t.identifier, x: t.clientX, y: t.clientY };
+    else if (!look) look = { id: t.identifier, x: t.clientX, y: t.clientY };
+  }
+}, { passive: true });
+canvas.addEventListener('touchmove', (e) => {
+  for (const t of e.changedTouches) {
+    if (joy && t.identifier === joy.id) { joyS = cl((t.clientX - joy.x) / 50); joyF = cl(-(t.clientY - joy.y) / 50); }
+    if (look && t.identifier === look.id) {
+      yaw -= (t.clientX - look.x) * 0.006 * SENS;
+      pitch = Math.max(-1.5, Math.min(1.5, pitch - (t.clientY - look.y) * 0.005 * SENS * (INVERT_Y ? -1 : 1)));
+      look.x = t.clientX; look.y = t.clientY;
+    }
+  }
+}, { passive: true });
+canvas.addEventListener('touchend', (e) => {
+  for (const t of e.changedTouches) {
+    if (joy && t.identifier === joy.id) { joy = null; joyF = joyS = 0; }
+    if (look && t.identifier === look.id) look = null;
+  }
+});
+const fireBtn = document.getElementById('fire');
+fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); fireDown(); });
+fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); fireUp(); });
+document.getElementById('jump').addEventListener('touchstart', (e) => { e.preventDefault(); jump(); });
+
+document.getElementById('demoEat').onclick = (e) => { startEat('person'); e.target.blur(); };
+// ===== 主畫面、設定、暫停 =====
+function setSwingMode(v) {
+  swingMode = v;
+  document.getElementById('mode').textContent = v ? '模式：盪鞦韆' : '模式：直拉';
+  for (const b of document.querySelectorAll('#tongueSeg button')) b.classList.toggle('on', (b.dataset.swing === '1') === v);
+}
+document.getElementById('mode').onclick = (e) => { setSwingMode(!swingMode); e.target.blur(); };
+for (const b of document.querySelectorAll('#tongueSeg button')) b.onclick = () => setSwingMode(b.dataset.swing === '1');
+document.getElementById('sens').oninput = (e) => (SENS = +e.target.value);
+document.getElementById('invertY').onchange = (e) => (INVERT_Y = e.target.checked);
+
+function closeSheets() { for (const el of document.querySelectorAll('.sheet:not(#pause)')) el.hidden = true; }
+for (const b of document.querySelectorAll('[data-open]')) b.onclick = () => { document.getElementById(b.dataset.open).hidden = false; };
+for (const b of document.querySelectorAll('[data-close]')) b.onclick = () => { b.closest('.sheet').hidden = true; };
+addEventListener('keydown', (e) => { if (e.code === 'Escape') closeSheets(); });
+
+function resetFrog() {
+  pos.set(0, 1, 0); vel.set(0, 0, 0); tongue = null; holding = false; eatState = null;
+  yaw = 0; pitch = 0.15; for (const k in keys) keys[k] = false; joyF = joyS = 0;
+}
+function startGame() {
+  resetFrog(); started = true; closeSheets(); pauseEl.hidden = true;
+  document.body.classList.remove('in-menu');
+  document.getElementById('menu').hidden = true;
+  lockMouse();
+}
+function toMenu() {
+  started = false; resetFrog(); closeSheets(); pauseEl.hidden = true;
+  if (document.pointerLockElement) document.exitPointerLock();
+  document.body.classList.add('in-menu');
+  document.getElementById('menu').hidden = false;
+}
+document.getElementById('go').onclick = startGame;
+document.getElementById('toMenu').onclick = toMenu;
+document.getElementById('resume').onclick = () => { if (isTouch) { pauseEl.hidden = true; closeSheets(); } else lockMouse(); };
+document.getElementById('pauseBtn').onclick = () => { fireUp(); pauseEl.hidden = false; };
+
+// 主畫面上的青蛙：左右張望，偶爾吐舌頭或嚼東西，點牠會鼓起臉頰
+let nextIdle = 2500;
+function flick() {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  holding = false;
+  tongue = { phase: 'out', tip: mouth(), target: new THREE.Vector3(pos.x + side * (4 + Math.random() * 3), pos.y + 2 + Math.random() * 2, pos.z - 3), hit: false };
+}
+function menuTick(now) {
+  if (started) return;
+  yaw = Math.sin(now / 2000) * 0.35;
+  if (now > nextIdle && !tongue && !eatState) {
+    if (Math.random() < 0.6) flick(); else startEat('fruit');
+    nextIdle = now + 2500 + Math.random() * 3500;
+  }
+}
+canvas.addEventListener('pointerdown', () => {
+  if (started) return;
+  if (!eatState) startEat('person'); else if (!tongue) flick();
+  nextIdle = performance.now() + 4000;
+});
+function menuCamera(now) {
+  const portrait = innerWidth < innerHeight;
+  const dist = portrait ? 6.6 : 4.8;
+  camera.position.set(pos.x + Math.sin(now / 6000) * 0.5, pos.y + (portrait ? 1.3 : 0.9), pos.z - dist);
+  // 橫向畫面：青蛙放右邊，左邊留給選單；直向畫面：青蛙放上面，下面留給選單
+  camera.lookAt(pos.x + (portrait ? 0 : 1.7), pos.y + (portrait ? -1.75 : 0.35), pos.z);
+}
+addEventListener('beforeunload', (e) => { if (started) { e.preventDefault(); e.returnValue = ''; } });
+
+// ===== 物理 =====
+function update(dt) {
+  const mf = !started ? 0 : (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + joyF;
+  const ms = !started ? 0 : (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + joyS;
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+  let ax = fx * mf + rx * ms, az = fz * mf + rz * ms;
+  const al = Math.hypot(ax, az); if (al > 1) { ax /= al; az /= al; }
+
+  if (grounded) {
+    const k = Math.min(1, 10 * dt);
+    vel.x += (ax * MOVE_SPEED - vel.x) * k;
+    vel.z += (az * MOVE_SPEED - vel.z) * k;
+  } else {
+    vel.x += ax * AIR_CONTROL * dt;
+    vel.z += az * AIR_CONTROL * dt;
+    vel.multiplyScalar(1 - 0.08 * dt);   // 空氣阻力
+  }
+  vel.y -= GRAVITY * dt;
+
+  // 舌頭
+  if (tongue) {
+    if (tongue.phase === 'out') {
+      const d = tongue.target.clone().sub(tongue.tip), step = TONGUE_SPEED * dt;
+      if (d.length() <= step) {
+        tongue.tip.copy(tongue.target);
+        if (tongue.hit && holding) { tongue.phase = 'stuck'; tongue.L = pos.distanceTo(tongue.target); }
+        else tongue.phase = 'back';
+      } else tongue.tip.addScaledVector(d.normalize(), step);
+    } else if (tongue.phase === 'back') {
+      const m = mouth(), d = m.clone().sub(tongue.tip), step = TONGUE_SPEED * 1.3 * dt;
+      if (d.length() <= step) tongue = null; else tongue.tip.addScaledVector(d.normalize(), step);
+    } else if (tongue.phase === 'stuck') {
+      grounded = false;
+      if (swingMode) {
+        tongue.L = Math.max(4, tongue.L - REEL_SPEED * dt);
+      } else {
+        const d = tongue.target.clone().sub(pos), len = d.length();
+        vel.addScaledVector(d.normalize(), PULL_FORCE * dt);
+        vel.multiplyScalar(1 - 1.2 * dt);
+        if (len < 3) { tongue.phase = 'back'; vel.y += 6; }
+      }
+    }
+  }
+
+  pos.addScaledVector(vel, dt);
+
+  // 盪鞦韆：舌頭像繩子，不能超過長度
+  if (tongue && tongue.phase === 'stuck' && swingMode) {
+    const n = pos.clone().sub(tongue.target), d = n.length();
+    if (d > tongue.L) {
+      n.divideScalar(d);
+      pos.copy(tongue.target).addScaledVector(n, tongue.L);
+      const vr = vel.dot(n);
+      if (vr > 0) vel.addScaledVector(n, -vr);
+    }
+  }
+
+  // 碰撞
+  grounded = false;
+  if (pos.y < 1) { pos.y = 1; if (vel.y < 0) vel.y = 0; grounded = true; }
+  for (const [x, z, r, h] of trunks) {
+    const dx = pos.x - x, dz = pos.z - z, d = Math.hypot(dx, dz), feet = pos.y - 1;
+    if (d < r * 1.7 && feet < h + 0.35 && feet > h - 1.2 && vel.y <= 0) {
+      pos.y = h + 1.35; vel.y = 0; grounded = true;          // 站上樹頂
+    } else if (d < r + 1 && feet < h - 0.4 && d > 0) {
+      const nx = dx / d, nz = dz / d;                          // 推出樹幹
+      pos.x = x + nx * (r + 1); pos.z = z + nz * (r + 1);
+      const vn = vel.x * nx + vel.z * nz; if (vn < 0) { vel.x -= vn * nx; vel.z -= vn * nz; }
+    }
+  }
+  for (const [x, y, z, r] of rocks) {
+    const n = new THREE.Vector3(pos.x - x, pos.y - y, pos.z - z), d = n.length();
+    if (d < r + 1 && d > 0) {
+      n.divideScalar(d); pos.set(x, y, z).addScaledVector(n, r + 1);
+      const vn = vel.dot(n); if (vn < 0) vel.addScaledVector(n, -vn);
+      if (n.y > 0.6) grounded = true;
+    }
+  }
+  pos.x = Math.max(-89, Math.min(89, pos.x)); pos.z = Math.max(-89, Math.min(89, pos.z));
+
+  // 收集果實
+  for (const f of fruits) if (f.position.distanceTo(pos) < 2.2) { score++; placeFruit(f); startEat('fruit'); }
+}
+
+// ===== 繪製 =====
+let last = performance.now();
+// ===== 角色動畫（只影響外觀，不影響碰撞和物理）=====
+let squash = 1, walkPhase = 0, nextBlink = 2000;
+function animateCharacter(now, dt) {
+  const hs = Math.hypot(vel.x, vel.z);
+  // 空中依照上下速度拉長或壓扁
+  const target = grounded ? 1 : 1 + Math.max(-0.15, Math.min(0.2, vel.y * 0.008));
+  squash += (target - squash) * Math.min(1, 12 * dt);
+  // 走路時一跳一跳、身體往前傾
+  if (grounded && hs > 0.5) walkPhase += dt * hs * 0.9; else walkPhase *= 0.9;
+  const hop = grounded ? Math.abs(Math.sin(walkPhase)) * Math.min(1, hs / MOVE_SPEED) * 0.18 : 0;
+  // 吃東西
+  let cheekAmt = 0, chewWob = 0;
+  if (eatState) {
+    const e = eatState; e.t += dt;
+    const full = e.big ? 1.45 : 0.9;
+    if (e.t < e.chew) {                                        // 鼓著嘴嚼
+      cheekAmt = Math.min(1, e.t / 0.12) * full;
+      chewWob = Math.sin(e.t * 17) * 0.08;
+      if (e.big) chewWob += Math.sin(e.t * 6.3) * 0.06;        // 嘴裡的人在掙扎
+    } else if (e.t < e.chew + 0.3) {                           // 臉頰慢慢消下去
+      cheekAmt = (1 - (e.t - e.chew) / 0.3) * full;
+    } else eatState = null;
+  }
+  for (const c of cheeks) { const k = cheekAmt * (1 + chewWob); c.visible = k > 0.02; c.scale.setScalar(Math.max(k, 0.001)); }
+  bodyRig.scale.set(1 / Math.sqrt(squash), squash, 1 / Math.sqrt(squash));
+  bodyRig.position.y = hop;
+  bodyRig.rotation.x = grounded ? -Math.min(0.22, hs * 0.018) : 0;
+  feet[0].position.z = -0.05 + Math.sin(walkPhase) * 0.2 * (grounded ? 1 : 0);
+  feet[1].position.z = -0.05 - Math.sin(walkPhase) * 0.2 * (grounded ? 1 : 0);
+  for (const f of feet) f.position.y = grounded ? -0.62 : -0.68;
+  // 張嘴：吐舌時打開，嘴裡塞滿東西時閉緊
+  const openTarget = tongue && !cheekAmt ? 1 : 0;
+  mouthOpen += (openTarget - mouthOpen) * Math.min(1, 14 * dt);
+  const h = 0.15 * mouthOpen;                                     // 口腔半高
+  const cy = MOUTH_Y - 0.06 * mouthOpen;                          // 下巴往下
+  mouthCY = cy;
+  const hw = (cheekAmt ? 0.72 : 1 - 0.12 * mouthOpen) * MOUTH_W;  // 張嘴時稍微變圓；塞滿時抿小
+  shapeMouth(lip, cy, hw + 0.035, 0.032 + h + 0.03 * mouthOpen);
+  shapeMouth(cavity, cy, hw - 0.005, h);
+  shapeMouth(tongueRoot, cy - h * 0.45, hw * 0.6, h * 0.45);
+  headTop.position.y = 0.08 * mouthOpen;                        // 頭頂往上抬
+  // 眨眼
+  let lid = 1;
+  if (now > nextBlink) { lid = 0.12; if (now > nextBlink + 120) nextBlink = now + 2500 + Math.random() * 3000; }
+  if (cheekAmt > 0.3) lid = Math.min(lid, 0.45);                // 嚼東西時滿足地瞇眼
+  for (const e of eyes) e.scale.y += (lid - e.scale.y) * 0.6;
+  // 影子：投在正下方第一個碰到的東西上，越高越淡越小
+  shadowRay.set(pos, DOWN);
+  const hit = shadowRay.intersectObjects(shadowTargets)[0];
+  shadow.visible = !!hit;
+  if (hit) {
+    const height = pos.y - hit.point.y;
+    shadow.position.set(pos.x, hit.point.y + 0.03, pos.z);
+    shadow.scale.setScalar(Math.max(0.4, 1 - height * 0.015));
+    shadow.material.opacity = Math.max(0.08, 0.3 - height * 0.006);
+  }
+}
+function frame(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now;
+  menuTick(now);
+  update(dt);
+
+  player.position.copy(pos); player.rotation.y = yaw;
+  animateCharacter(now, dt);
+  if (started) {
+    const f = aimDir();
+    const camTarget = pos.clone().add(new THREE.Vector3(0, 1.8, 0));
+    camera.position.copy(camTarget).addScaledVector(f, -8);
+    if (camera.position.y < 0.5) camera.position.y = 0.5;
+    camera.lookAt(camTarget.clone().addScaledVector(f, 10));
+  } else menuCamera(now);
+
+  tongueBody.visible = tongueTip.visible = tongueBase.visible = tongueJoint.visible = !!tongue;
+  if (tongue) {
+    const w = 0.35 + 0.65 * mouthOpen;                  // 嘴巴還沒完全張開時舌頭細一點，不會卡到嘴唇
+    const inside = mouthPoint(-0.15), exit = mouthPoint(TONGUE_EXIT);
+    placeSegment(tongueBase, inside, exit, w);
+    placeSegment(tongueBody, exit, tongue.tip, w);
+    tongueJoint.position.copy(exit); tongueJoint.scale.setScalar(w);
+    tongueTip.position.copy(tongue.tip);
+  }
+
+  for (const [i, fr] of fruits.entries()) { fr.rotation.y = now / 500 + i; fr.userData.inner.position.y = Math.sin(now / 450 + i) * 0.35; }
+  document.getElementById('cross').classList.toggle('on', !tongue && !!findHook());
+  document.getElementById('stats').textContent = `果實 ${score}　速度 ${Math.round(Math.hypot(vel.x, vel.z, vel.y))}`;
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
